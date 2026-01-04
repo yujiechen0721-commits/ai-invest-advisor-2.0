@@ -1,42 +1,170 @@
-# app.py (主應用入口：多頁面架構，提升專業性與互動性)
 import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 
-# 隱藏右上角 GitHub + Fork 按鈕，並設定全局樣式
-hide_menu_style = """
+# --- 頁面基本配置 ---
+st.set_page_config(
+    page_title="AI Pro 投資領航員",
+    page_icon="💎",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# --- 專業深色美化 CSS ---
+st.markdown("""
     <style>
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    div[data-testid="stExpander"] { background-color: white; border-radius: 10px; }
     #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    body {font-family: 'Segoe UI', sans-serif;}
-    .stButton > button {background-color: #00C853; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold;}
-    .stButton > button:hover {background-color: #009624;}
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007bff; color: white; }
     </style>
-    """
-st.markdown(hide_menu_style, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# 主頁面內容
-st.title("AI 投資小秘書")
-st.markdown("---")
-st.subheader("歡迎來到 AI 投資小秘書！")
-st.write("""
-    這是一個專業的 AI 輔助投資平台，幫助您根據年齡、風險偏好與每月投入金額，生成個人化資產配置建議。
-    我們使用現代投資組合理論 (Modern Portfolio Theory) 結合歷史數據模擬，預估您的長期財富成長。
+# --- 導覽列設計 ---
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2622/2622814.png", width=80)
+    st.title("AI 投資領航員")
+    st.markdown("---")
+    menu = st.radio(
+        "功能導覽",
+        ["🏠 數據首頁", "🎯 智能資產配置", "🔍 全球市場追蹤", "📚 投資知識庫"]
+    )
+    st.markdown("---")
+    st.caption("版本 v2.1.0 | 數據由 Yahoo Finance 提供")
+
+# ==========================================
+# 🏠 數據首頁：市場快訊與核心指標
+# ==========================================
+if menu == "🏠 數據首頁":
+    st.title("今日全球市場概況")
     
-    **主要功能：**
-    - **投資建議生成器**：輸入個人資訊，獲取 AI 推薦的資產配置與 20 年複利模擬圖表。
-    - **資產分析工具**：查看個別資產歷史表現、實時報價與比較。
-    - **教育資源**：學習投資基礎知識、風險管理與市場趨勢。
-    - **個人化設定**：儲存您的偏好，接收模擬 LINE 盤後簡訊通知（未來可整合真實 API）。
+    # 頂部指標
+    col1, col2, col3, col4 = st.columns(4)
+    with col1: st.metric("台股加權 (TWII)", "18,234.5", "+1.25%")
+    with col2: st.metric("標普 500 (SPY)", "4,783.2", "-0.12%")
+    with col3: st.metric("恐懼與貪婪指數", "68", "貪婪")
+    with col4: st.metric("美債 10Y 殖利率", "4.15%", "-0.05")
+
+    st.markdown("### 🚀 熱門主題分析")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.info("💡 **AI 觀點**：目前半導體板塊顯示出強勁的動能，建議關注 2330.TW 的支撐位。")
+    with c2:
+        st.warning("⚠️ **風險提示**：通膨數據將於明日公佈，市場波動可能加劇。")
+
+    st.markdown("### 📅 近期關鍵事件")
+    event_data = {
+        "日期": ["2024-01-10", "2024-01-15", "2024-01-20"],
+        "事件": ["美國 CPI 公佈", "台積電法說會", "聯準會利率決策"],
+        "重要性": ["⭐⭐⭐", "⭐⭐", "⭐⭐⭐"]
+    }
+    st.table(pd.DataFrame(event_data))
+
+# ==========================================
+# 🎯 智能資產配置：互動式規劃器
+# ==========================================
+elif menu == "🎯 智能資產配置":
+    st.title("🎯 智能投資組合建議")
     
-    請從側邊欄選擇功能開始您的投資之旅！
-""")
+    col_l, col_r = st.columns([1, 2])
+    
+    with col_l:
+        st.subheader("參數設定")
+        user_age = st.slider("年齡", 18, 80, 30)
+        user_budget = st.number_input("每月預計投入 (TWD)", 5000, 500000, 10000, 5000)
+        user_risk = st.select_slider("風險承擔意願", options=["保守", "穩健", "平衡", "成長", "激進"], value="平衡")
+        
+        generate = st.button("生成分析報告")
 
-# 免責聲明（置於主頁底部）
+    if generate:
+        with col_r:
+            st.subheader("分析結果")
+            
+            # 簡單配置邏輯
+            alloc = {"台股龍頭": 40, "全球股票": 30, "美國公債": 20, "現金備用": 10}
+            if user_risk == "激進": alloc = {"台股龍頭": 60, "全球股票": 30, "加密貨幣": 10}
+            
+            # 圓餅圖
+            fig = go.Figure(data=[go.Pie(labels=list(alloc.keys()), values=list(alloc.values()), hole=.4)])
+            fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.success(f"建議策略：**{user_risk}型配置**")
+            st.write(f"預計在 {user_age+20} 歲時，透過複利效應，您的資產規模將極大化。")
+            
+            with st.expander("查看具體代碼建議"):
+                st.write("- **0050.TW** (佔比 40%)")
+                st.write("- **VT** (佔比 30%)")
+                st.write("- **BND** (佔比 30%)")
+
+# ==========================================
+# 🔍 全球市場追蹤：專業看盤區
+# ==========================================
+elif menu == "🔍 全球市場追蹤":
+    st.title("🔍 即時數據監控")
+    
+    target = st.text_input("請輸入股票或 ETF 代碼 (例如: 2330.TW, TSLA, 0050.TW)", "2330.TW")
+    
+    if target:
+        try:
+            with st.spinner('正在獲取最新數據...'):
+                df = yf.download(target, period="6mo")
+                
+                # 指標卡片
+                last_price = df['Close'].iloc[-1]
+                change = df['Close'].iloc[-1] - df['Close'].iloc[-2]
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("當前價格", f"{last_price:,.2f}", f"{change:,.2f}")
+                c2.metric("半年最高", f"{df['High'].max():,.2f}")
+                c3.metric("半年最低", f"{df['Low'].min():,.2f}")
+                
+                # K 線圖
+                fig = go.Figure(data=[go.Candlestick(
+                    x=df.index,
+                    open=df['Open'], high=df['High'],
+                    low=df['Low'], close=df['Close'],
+                    increasing_line_color='#ef5350', decreasing_line_color='#26a69a'
+                )])
+                fig.update_layout(title=f"{target} 走勢圖", xaxis_rangeslider_visible=False, height=500)
+                st.plotly_chart(fig, use_container_width=True)
+        except:
+            st.error("無法讀取數據，請確認代碼是否正確。")
+
+# ==========================================
+# 📚 投資知識庫：教育功能
+# ==========================================
+elif menu == "📚 投資知識庫":
+    st.title("📚 投資必修課")
+    
+    topics = {
+        "新手入門": ["什麼是複利？", "定期定額 vs 單筆投入", "ETF 是什麼？"],
+        "進階策略": ["資產撥備與再平衡", "技術指標 KD/RSI 應用", "財報分析基礎"],
+        "心理素質": ["如何應對股市大跌？", "克服貪婪與恐懼"]
+    }
+    
+    tab1, tab2, tab3 = st.tabs(["基礎概念", "技術分析", "投資心理"])
+    
+    with tab1:
+        st.markdown("""
+        ### 為什麼要投資？
+        投資的核心在於對抗通膨。若通膨率為 3%，現在的 100 萬在 20 年後購買力僅剩約 54 萬。
+        ### 定期定額的威力
+        這是一種利用「時間」攤平「成本」的策略，適合大多數上班族。
+        """)
+        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # 此處可放教學影片連結
+
+    with tab2:
+        st.info("這裡可以放置更多關於如何閱讀本站圖表的教學。")
+        
+    with tab3:
+        st.warning("投資成功的關鍵不在於智商，而在於自律。")
+
+# --- 頁尾 ---
 st.markdown("---")
-st.caption("免責聲明：本工具僅供教育與模擬用途，非證券投資顧問建議。歷史報酬不代表未來表現。投資有風險，請自行評估。")
-
-# 注意：多頁面架構需在同一目錄下建立 'pages' 資料夾，並放置以下檔案：
-# - pages/investment_advisor.py (投資建議生成器)
-# - pages/asset_analyzer.py (資產分析工具)
-# - pages/education_resources.py (教育資源)
-# - pages/personal_settings.py (個人化設定)
+st.markdown("<center> AI 投資領航員 © 2024 | 本網站僅供學習參考，不構成任何投資建議 </center>", unsafe_allow_html=True)
